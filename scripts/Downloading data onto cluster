@@ -1,0 +1,5 @@
+Accession Number: PRJNA712952
+Go to NCBI/SRA at https://www.ncbi.nlm.nih.gov/sra, search up the acc number given above and download the Accession List and RunInfo files
+
+Log into cluster: ssh <username>@bell.rcac.purdue.edu -- <enter password>
+Enter into your scratch database: $ cd $RCAC_SCRATCH
