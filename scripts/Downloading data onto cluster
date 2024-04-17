@@ -1,5 +1,78 @@
-Accession Number: PRJNA712952
-Go to NCBI/SRA at https://www.ncbi.nlm.nih.gov/sra, search up the acc number given above and download the Accession List and RunInfo files
+#Accession Number: PRJNA712952
+#Go to NCBI/SRA at https://www.ncbi.nlm.nih.gov/sra, search up the acc number given above 
+#Download the Accession List and RunInfo files
 
-Log into cluster: ssh <username>@bell.rcac.purdue.edu -- <enter password>
-Enter into your scratch database: $ cd $RCAC_SCRATCH
+#Log into cluster
+  ssh <username>@bell.rcac.purdue.edu -- <enter password>
+#Enter into your scratch database
+  $ cd $RCAC_SCRATCH
+#make a new directory 
+  mkdir manuscript_project_scripts
+
+#In a new window, without logging in, from your computer, upload these files onto cluster:
+  cd ~/Desktop 
+  scp SraAccList.csv <username>@bell.rcac.purdue.edu:/scratch/bell/<username>/manuscript_project_scripts
+  scp SraRunInfo.csv <username>@bell.rcac.purdue.edu:/scratch/bell/<username>/manuscript_project_scripts
+
+#start an interactive session
+  sinteractive -A microbiome -t 2:30:00 -n4
+  mkdir data_download
+  cd data_download
+  mkdir use-scheduler
+#create a slurm file to run a job like: 
+#########################################################################
+
+#SBATCH --nodes=1                  ##number of requested nodes (a node is a group of CPUs)
+#SBATCH --tasks-per-node=12        ##number of requested CPUs
+#SBATCH --time=2:00:00             ##time requested
+#SBATCH --job-name SRA             ##name of job
+#SBATCH -A microbiome                ##name of the queue you are using. Could be scholar or microbiome if you are on snyder
+
+#########################################################################
+echo "start time"
+date +"%d %B %Y %H:%M:%S"
+
+#step 1, create a seq file for the sequences to be saved to
+pwd
+ls
+
+# SRR_Acc_List.txt --> SRA access numbers of each sequence
+# raw --> an empty directory to containing raw sra files
+# seq --> an empty directory to containing fastq files (translated from sra)
+
+pwd
+
+#step 2, Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+
+echo "loading sra-toolkit"
+module load sra-toolkit
+
+# downlaod sra files to raw directory
+echo "download raw :)"
+prefetch -O raw --option-file ../SraAccList.csv
+
+
+echo "copy raw seq to seq directory"
+cp raw/SRR*/*.sra seq/
+
+
+cd seq
+
+echo "split raw seq to paired seqs"
+for i in *.sra; do fasterq-dump ${i} --split-3 -O .; done
+
+rm *.sra
+
+echo "end time"
+date +"%d %B %Y %H:%M:%S"
+
+#########################################################################
+
+#save the slurm file as: SRA_download.slurm
+#run the job
+sbatch SRA_download.slurm
+#check if your job is running
+squeue -A microbiome
