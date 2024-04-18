@@ -1,2 +1,18 @@
 #Log into cluster, and in the scratch data base 
-ssh 
+  ssh <username>@bell.rcac.purdue.edu -- <enter password>
+  cd $RCAC_SCRATCH
+  cd manuscript_project_scripts/data_download/use-scheduler/raw
+  ls
+#copy all the sample-ids and add to the excel sheet below 
+
+  cd ../seq
+#To get path for forward sequences
+  ls -1 "$PWD/"*_1*
+#To get path for reverse sequences
+  ls -1 "$PWD/"*_2*
+
+#In an excel file, create 3 columns- 
+  sample-id  forward-absolute-filepath  reverse-absolute-filepath
+#copy the sample-ids, and the paths respectively
+
+#save as a tab delimited text file
