@@ -3,13 +3,50 @@
   cd $RCAC_SCRATCH
   cd manuscript_project_scripts/data_download/use-scheduler/
 
+#run a scheduled job for demultiplexing the data
+
+#########################################################################
+#!/bin/sh -l
+
+#SBATCH --nodes=1                  ##number of requested nodes (a node is a group of CPUs)
+#SBATCH --tasks-per-node=12        ##number of requested CPUs
+#SBATCH --time=40:00:00             ##time requested
+#SBATCH --job-name manifest             ##name of job
+#SBATCH -A microbiome                ##name of the queue you are using. Could be scholar or microbiome if you are on snyder
+
+#########################################################################
+echo "start time"
+date +"%d %B %Y %H:%M:%S"
+
+
+#step 2, Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+module load Qiime/2-2023.9
+
+cd $RCAC_SCRATCH
+cd manuscript_project_scripts
+
+echo "running import code"
+qiime tools import \
+--type 'SampleData[PairedEndSequencesWithQuality]' \
+--input-path Manuscript_ManifestFile.txt \
+--input-format PairedEndFastqManifestPhred33V2 \
+--output-path data_download/use-scheduler/demux.qza
+
+echo "end time"
+date +"%d %B %Y %H:%M:%S
+
+#########################################################################
+
+#run summarization
 #load modules
   module load bioinfo
   module load Qiime/2-2023.9
 #check if modules have been loaded successfully
   module list #or ml
 
-#run summarization
   qiime demux summarize \
   --i-data demux.qza \
   --o-visualization demux.qzv
