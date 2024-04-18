@@ -5,6 +5,7 @@
   ls
 #copy all the sample-ids and add to the excel sheet below 
 
+#get out of raw and into seq
   cd ../seq
 #To get path for forward sequences
   ls -1 "$PWD/"*_1*
@@ -15,4 +16,4 @@
   sample-id  forward-absolute-filepath  reverse-absolute-filepath
 #copy the sample-ids, and the paths respectively
 
-#save as a tab delimited text file
+#save as "Manuscript_ManifestFile.txt" a tab delimited text file
