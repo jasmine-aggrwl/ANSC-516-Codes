@@ -21,7 +21,9 @@
   mkdir use-scheduler
 
 #create a slurm file to run a job like: 
+
 #########################################################################
+#!/bin/sh -l
 
 #SBATCH --nodes=1                  ##number of requested nodes (a node is a group of CPUs)
 #SBATCH --tasks-per-node=12        ##number of requested CPUs
