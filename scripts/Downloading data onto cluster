@@ -5,7 +5,7 @@
 #Log into cluster
   ssh <username>@bell.rcac.purdue.edu -- <enter password>
 #Enter into your scratch database
-  $ cd $RCAC_SCRATCH
+  cd $RCAC_SCRATCH
 #make a new directory 
   mkdir manuscript_project_scripts
 
