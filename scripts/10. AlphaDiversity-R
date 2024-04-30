@@ -1,0 +1,305 @@
+################################################################################
+########################Alpha Diversity for caries-active#######################
+library(tidyverse)
+library(qiime2R)
+library(ggpubr)
+
+getwd()
+#if directory isn't already set; 
+setwd("../data")
+
+########################################################
+#setting the metadata
+metadata <- read.delim("NewMetadataFile.txt", sep = "\t", header = T, quote = "", stringsAsFactors = F)
+#remove rows with caries-free
+metadata <- metadata[-c(1:57), ]
+
+#Now the qiime2R method
+str(metadata)
+metadata$treatment <- factor(metadata$treatment)
+#the above live makes "treatment" as a factor; I can then read what the various values are within it
+levels(metadata$`treatment`)
+#"levels" reads the different values in the column "treatment" 
+colnames(metadata)[4] <- "caries.status"
+str(metadata)
+metadata$caries.status <- factor(metadata$caries.status)
+levels(metadata$`caries.status`)
+str(metadata)
+
+row.names(metadata) <- metadata$sample.id
+row.names(metadata)
+########################################################
+
+setwd("core-metrics-results")
+
+evenness = read_qza("evenness_vector.qza")
+evenness<-evenness$data %>% rownames_to_column("SampleID") # this moves the sample names to a new column that matches the metadata and allows them to be merged
+
+observed_features = read_qza("observed_features_vector.qza")
+observed_features<-observed_features$data %>% rownames_to_column("SampleID") # this moves the sample names to a new column that matches the metadata and allows them to be merged
+
+shannon = read_qza("shannon_vector.qza")
+shannon<-shannon$data %>% rownames_to_column("SampleID") # this moves the sample names to a new column that matches the metadata and allows them to be merged
+
+faith_pd = read_qza("faith_pd_vector.qza")
+faith_pd<-faith_pd$data %>% rownames_to_column("SampleID") # this moves the sample names to a new column that matches the metadata and allows them to be merged\
+faith_pd <- faith_pd[,-1] 
+colnames(faith_pd) <- c('SampleID', 'faith_pd')
+
+str(metadata)
+str(observed_features)
+
+alpha_diversity = merge(x=faith_pd, y=evenness, by.x = "SampleID", by.y = "SampleID")
+alpha_diversity = merge(alpha_diversity, observed_features, by.x = "SampleID", by.y = "SampleID")
+alpha_diversity = merge(alpha_diversity, shannon, by.x = "SampleID", by.y = "SampleID")
+metadata = merge(metadata, alpha_diversity, by.x = "sample.id", by.y = "SampleID")
+row.names(metadata) <- metadata$SampleID
+#meta = meta[,-1]
+str(metadata)
+
+#Plots
+hist(metadata$shannon_entropy, main="Shannon diversity", xlab="", breaks=10)
+hist(metadata$faith_pd, main="Faith phylogenetic diversity", xlab="", breaks=10)
+hist(metadata$pielou_e, main="Evenness", xlab="", breaks=10)
+hist(as.numeric(metadata$observed_features), main="Observed Features", xlab="", breaks=10)
+
+library(ggplot2)
+#install.packages("ggpubr")
+library("ggpubr")
+
+#Plots the qq-plot for residuals
+ggqqplot(metadata$shannon_entropy, title = "Shannon")
+ggqqplot(metadata$faith_pd, title = "Faith PD")
+ggqqplot(metadata$pielou_e, title = "Evenness")
+ggqqplot(metadata$observed_features, title = "Observed Features")
+
+# To test for normalcy statistically, we can run the Shapiro-Wilk 
+# test of normality.
+
+shapiro.test(metadata$shannon)
+shapiro.test(metadata$faith_pd)
+shapiro.test(metadata$pielou_e)
+shapiro.test(metadata$observed_features)
+
+#none of them are normally distributed (all p=values are less than 0.05)
+
+# ANOVA, t-test, or general linear models with the normal distribution
+# Kruskal-Wallis, Wilcoxon rank sum test, or general linear models 
+
+levels(metadata$treatment)
+metadata$treatment.ord = factor(metadata$treatment, c("control", "fl_treatment", "fl_arg_treatment"))
+levels(metadata$treatment.ord)
+
+#not normally distributed 
+kruskal.test(faith_pd ~ treatment.ord, data=metadata)
+pairwise.wilcox.test(metadata$faith_pd, metadata$treatment.ord, p.adjust.method="BH")
+boxplot(faith_pd ~ treatment.ord, data=metadata, ylab="Faith phylogenetic diversity", xlab="Treatment")
+
+faith_pd_boxplot <- ggplot(metadata, aes(treatment.ord, faith_pd)) + 
+  geom_boxplot(aes(color = treatment.ord)) + 
+  #ylim(c(0.5,1)) +
+  theme_q2r() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(legend.title = element_blank()) +
+  labs(y="Faith Phylogenetic Diversity", x = "") 
+ggsave("../../output/pd_caries-active.png", faith_pd_boxplot, height = 3, width = 3)
+
+kruskal.test(shannon_entropy ~ treatment.ord, data=metadata)
+pairwise.wilcox.test(metadata$shannon_entropy, metadata$treatment.ord, p.adjust.method="BH")
+boxplot(shannon_entropy ~ treatment.ord, data=metadata, ylab="Shannon Entropy", xlab="Treatment")
+
+shannon_entropy_boxplot <- ggplot(metadata, aes(treatment.ord, shannon_entropy)) + 
+  geom_boxplot(aes(color = treatment.ord)) + 
+  #ylim(c(0.5,1)) +
+  theme_q2r() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(legend.title = element_blank()) +
+  labs(y="Shannon Entropy", x = "") 
+ggsave("../../output/shannon_caries-active.png", shannon_entropy_boxplot, height = 3, width = 3)
+
+kruskal.test(observed_features ~ treatment.ord, data=metadata)
+pairwise.wilcox.test(metadata$observed_features, metadata$treatment.ord, p.adjust.method="BH")
+boxplot(observed_features ~ treatment.ord, data=metadata, ylab="Observed Features", xlab="Treatment")
+
+observed_features_boxplot <- ggplot(metadata, aes(treatment.ord, observed_features)) + 
+  geom_boxplot(aes(color = treatment.ord)) + 
+  #ylim(c(0.5,1)) +
+  theme_q2r() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(legend.title = element_blank()) +
+  labs(y="Observed Features", x = "") 
+ggsave("../../output/obsfeatures_caries-active.png", shannon_entropy_boxplot, height = 3, width = 3)
+
+kruskal.test(pielou_evenness ~ treatment.ord, data=metadata)
+pairwise.wilcox.test(metadata$pielou_evenness, metadata$treatment.ord, p.adjust.method="BH")
+boxplot(pielou_evenness ~ treatment.ord, data=metadata, ylab="Pielou's Evenness Index", xlab="Treatment")
+
+pielou_evenness_boxplot <- ggplot(metadata, aes(treatment.ord, pielou_evenness)) + 
+  geom_boxplot(aes(color = treatment.ord)) + 
+  #ylim(c(0.5,1)) +
+  theme_q2r() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(legend.title = element_blank()) +
+  labs(y="Observed Features", x = "") 
+ggsave("../../output/evenness_caries-active.png", pielou_evenness_boxplot, height = 3, width = 3)
+
+################################################################################
+#########################Alpha Diversity for caries-free########################
+
+########################################################
+getwd()
+setwd("../")
+#setting the metadata
+metadata <- read.delim("NewMetadataFile.txt", sep = "\t", header = T, quote = "", stringsAsFactors = F)
+#remove rows with caries-free
+metadata <- metadata[-c(58:108), ]
+
+#Now the qiime2R method
+str(metadata)
+metadata$treatment <- factor(metadata$treatment)
+#the above live makes "treatment" as a factor; I can then read what the various values are within it
+levels(metadata$`treatment`)
+#"levels" reads the different values in the column "treatment" 
+colnames(metadata)[4] <- "caries.status"
+str(metadata)
+metadata$caries.status <- factor(metadata$caries.status)
+levels(metadata$`caries.status`)
+str(metadata)
+
+row.names(metadata) <- metadata$sample.id
+row.names(metadata)
+########################################################
+
+setwd("core-metrics-results")
+
+evenness = read_qza("evenness_vector.qza")
+evenness<-evenness$data %>% rownames_to_column("SampleID") # this moves the sample names to a new column that matches the metadata and allows them to be merged
+
+observed_features = read_qza("observed_features_vector.qza")
+observed_features<-observed_features$data %>% rownames_to_column("SampleID") # this moves the sample names to a new column that matches the metadata and allows them to be merged
+
+shannon = read_qza("shannon_vector.qza")
+shannon<-shannon$data %>% rownames_to_column("SampleID") # this moves the sample names to a new column that matches the metadata and allows them to be merged
+
+faith_pd = read_qza("faith_pd_vector.qza")
+faith_pd<-faith_pd$data %>% rownames_to_column("SampleID") # this moves the sample names to a new column that matches the metadata and allows them to be merged\
+faith_pd <- faith_pd[,-1] 
+colnames(faith_pd) <- c('SampleID', 'faith_pd')
+
+str(metadata)
+str(observed_features)
+
+alpha_diversity = merge(x=faith_pd, y=evenness, by.x = "SampleID", by.y = "SampleID")
+alpha_diversity = merge(alpha_diversity, observed_features, by.x = "SampleID", by.y = "SampleID")
+alpha_diversity = merge(alpha_diversity, shannon, by.x = "SampleID", by.y = "SampleID")
+metadata = merge(metadata, alpha_diversity, by.x = "sample.id", by.y = "SampleID")
+row.names(metadata) <- metadata$SampleID
+#meta = meta[,-1]
+str(metadata)
+
+#Plots
+hist(metadata$shannon_entropy, main="Shannon diversity", xlab="", breaks=10)
+hist(metadata$faith_pd, main="Faith phylogenetic diversity", xlab="", breaks=10)
+hist(metadata$pielou_e, main="Evenness", xlab="", breaks=10)
+hist(as.numeric(metadata$observed_features), main="Observed Features", xlab="", breaks=10)
+
+#Plots the qq-plot for residuals
+ggqqplot(metadata$shannon_entropy, title = "Shannon")
+ggqqplot(metadata$faith_pd, title = "Faith PD")
+ggqqplot(metadata$pielou_e, title = "Evenness")
+ggqqplot(metadata$observed_features, title = "Observed Features")
+
+# To test for normalcy statistically, we can run the Shapiro-Wilk 
+# test of normality.
+
+shapiro.test(metadata$shannon)
+shapiro.test(metadata$faith_pd)
+shapiro.test(metadata$pielou_e)
+shapiro.test(metadata$observed_features)
+
+# ANOVA, t-test, or general linear models with the normal distribution
+# Kruskal-Wallis, Wilcoxon rank sum test, or general linear models 
+
+levels(metadata$treatment)
+metadata$treatment.ord = factor(metadata$treatment, c("control", "fl_treatment", "fl_arg_treatment"))
+levels(metadata$treatment.ord)
+
+#for observed features, data suggests it is normal...rest are not normal
+
+##not normally distributed
+#faith_pd
+kruskal.test(faith_pd ~ treatment.ord, data=metadata)
+pairwise.wilcox.test(metadata$faith_pd, metadata$treatment.ord, p.adjust.method="BH")
+#Plot
+boxplot(faith_pd ~ treatment.ord, data=metadata, ylab="Faith phylogenetic diversity", xlab="Treatment")
+
+faith_pd_boxplot <- ggplot(metadata, aes(treatment.ord, faith_pd)) + 
+  geom_boxplot(aes(color = treatment.ord)) + 
+  #ylim(c(0.5,1)) +
+  theme_q2r() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(legend.title = element_blank()) +
+  labs(y="Faith Phylogenetic Diversity", x = "") 
+ggsave("../../outputpd_caries-free.png", faith_pd_boxplot, height = 3, width = 3)
+
+#shannon
+kruskal.test(shannon_entropy ~ treatment.ord, data=metadata)
+pairwise.wilcox.test(metadata$shannon_entropy, metadata$treatment.ord, p.adjust.method="BH")
+boxplot(shannon_entropy ~ treatment.ord, data=metadata, ylab="shannon_entropy", xlab="Treatment")
+
+shannon_entropy_boxplot <- ggplot(metadata, aes(treatment.ord, shannon_entropy)) + 
+  geom_boxplot(aes(color = treatment.ord)) + 
+  #ylim(c(0.5,1)) +
+  theme_q2r() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5)) +
+  theme(legend.title = element_blank()) +
+  labs(y="shannon_entropy", x = "") 
+ggsave("../../output/shannon_caries-free.png", shannon_entropy_boxplot, height = 3, width = 3)
+
+#evenness
+kruskal.test(pielou_evenness ~ treatment.ord, data=metadata)
+pairwise.wilcox.test(metadata$pielou_evenness, metadata$treatment.ord, p.adjust.method="BH")
+boxplot(pielou_evenness ~ treatment.ord, data=metadata, ylab="pielou_evenness", xlab="Treatment")
+
+pielou_evenness_boxplot <- ggplot(metadata, aes(treatment.ord, pielou_evenness)) + 
+  geom_boxplot(aes(color = treatment.ord)) + 
+  #ylim(c(0.5,1)) +
+  theme_q2r() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(legend.title = element_blank()) +
+  labs(y="pielou_evenness", x = "") 
+ggsave("../../output/pielou_evenness_caries-free.png", pielou_evenness_boxplot, height = 3, width = 3)
+
+##normally distributed
+#for observed features
+aov.observed_features.treatment = aov(observed_features ~ treatment, data=metadata) #(column ~factor, dataframe)
+summary(aov.observed_features.treatment)
+TukeyHSD(aov.observed_features.treatment)
+
+boxplot(observed_features ~ treatment.ord, data=metadata, ylab="Observed Features", xlab="Treatment")
+
+observed_features_boxplot <- ggplot(metadata, aes(treatment.ord, observed_features)) + 
+  geom_boxplot() + 
+  #ylim(c(0.5,1)) +
+  theme_q2r() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+ggsave("../../output/observed_features_boxplot_caries-free.png", observed_features_boxplot, height = 3, width = 3)
+
+# Now, the above graph is kind of not correct. Our test and our graphic do not exactly match. ANOVA and Tukey are tests based on the mean, but the boxplot plots the median. Its not wrong, its just not the best method. Unfortunately plotting the average and standard deviation is a little complicated.
+
+observed_features_summary <- metadata %>% # the names of the new data frame and the data frame to be summarised
+  group_by(treatment.ord) %>%   # the grouping variable
+  summarise(mean_observed_features = mean(observed_features),  # calculates the mean of each group
+            sd_observed_features = sd(observed_features), # calculates the standard deviation of each group
+            n_observed_features = n(),  # calculates the sample size per group
+            se_observed_features = sd(observed_features)/sqrt(n())) # calculates the standard error of each group
+
+observed_features_se <- ggplot(observed_features_summary, aes(treatment.ord, mean_observed_features, fill = treatment.ord)) + 
+  geom_col() + 
+  geom_errorbar(aes(ymin = mean_observed_features - se_observed_features, ymax = mean_observed_features + se_observed_features), width=0.2) + 
+  theme_q2r() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  theme(legend.title = element_blank()) +
+  labs(y="Observed Features  ± s.e.", x = "") 
+
+ggsave("observed_features_se_caries-free.png", observed_features_se, height = 2.5, width = 3)
