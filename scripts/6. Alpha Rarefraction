@@ -1,0 +1,30 @@
+#!/bin/sh -l
+
+#SBATCH --nodes=1                  ##number of requested nodes (a node is a group of CPUs)
+#SBATCH --tasks-per-node=50        ##number of requested CPUs
+#SBATCH --time=40:00:00             ##time requested
+#SBATCH --job-name rarefraction              ##name of job
+#SBATCH -A microbiome                ##name of the queue you are using. Could be scholar or microbiome if you are on snyder
+
+#########################################################################
+echo "start time"
+date +"%d %B %Y %H:%M:%S"
+
+cd $RCAC_SCRATCH
+cd manuscript_project_scripts/data_download/use-scheduler
+
+#step: Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+module load Qiime/2-2023.9
+
+qiime diversity alpha-rarefaction \
+  --i-table table.qza \
+  --i-phylogeny rooted-tree.qza \
+  --p-max-depth 23400 \
+  --m-metadata-file ../../NewMetadataFile.txt \
+  --o-visualization alpha-rarefaction.qzv
+
+echo "end time"
+date +"%d %B %Y %H:%M:%S
