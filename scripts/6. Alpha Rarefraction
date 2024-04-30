@@ -1,3 +1,9 @@
+#Log into cluster, and cd in the scratch data base 
+  ssh <username>@bell.rcac.purdue.edu -- <enter password>
+  cd $RCAC_SCRATCH
+  cd manuscript_project_scripts/data_download/use-scheduler/
+
+#########################################################################
 #!/bin/sh -l
 
 #SBATCH --nodes=1                  ##number of requested nodes (a node is a group of CPUs)
@@ -28,3 +34,4 @@ qiime diversity alpha-rarefaction \
 
 echo "end time"
 date +"%d %B %Y %H:%M:%S
+#########################################################################
