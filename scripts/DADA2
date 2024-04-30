@@ -1,0 +1,56 @@
+log onto cluster 
+
+creat slurm file as follows: 
+#########################################################################
+#!/bin/sh -l
+
+#SBATCH --nodes=1                  ##number of requested nodes (a node is a group of CPUs)
+#SBATCH --tasks-per-node=50        ##number of requested CPUs
+#SBATCH --time=40:00:00             ##time requested
+#SBATCH --job-name DADA2             ##name of job
+#SBATCH -A microbiome                ##name of the queue you are using. Could be scholar or microbiome if you are on snyder
+
+#########################################################################
+echo "start time"
+date +"%d %B %Y %H:%M:%S"
+
+cd $RCAC_SCRATCH
+cd manuscript_project_scripts/data_download/use-scheduler
+
+#step: Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+module load Qiime/2-2023.9
+
+#step: denoise
+qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs demux.qza \
+  --p-trim-left-f 5 \
+  --p-trim-left-r 5 \
+  --p-trunc-len-f 230 \
+  --p-trunc-len-r 200 \
+  --o-table table.qza \
+  --o-representative-sequences rep-seqs.qza \
+  --o-denoising-stats denoising-stats.qza
+
+#step: summarizing our stats
+qiime feature-table summarize \
+  --i-table table.qza \
+  --o-visualization table.qzv \
+  --m-sample-metadata-file ../../NewMetadataFile.txt
+
+qiime feature-table tabulate-seqs \
+  --i-data rep-seqs.qza \
+  --o-visualization rep-seqs.qzv
+
+qiime metadata tabulate \
+  --m-input-file denoising-stats.qza \
+  --o-visualization denoising-stats.qzv
+
+echo "end time"
+date +"%d %B %Y %H:%M:%S
+
+#########################################################################
+
+sbatch DADA2.slurm
