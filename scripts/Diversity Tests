@@ -1,0 +1,110 @@
+#Log into cluster, and cd in the scratch data base 
+  ssh <username>@bell.rcac.purdue.edu -- <enter password>
+  cd $RCAC_SCRATCH
+  cd manuscript_project_scripts/data_download/use-scheduler/
+
+#Create slurm file as follows to run diversity metrics tests:
+
+#########################################################################
+#!/bin/sh -l
+
+#SBATCH --nodes=1                  ##number of requested nodes (a node is a group of CPUs)
+#SBATCH --tasks-per-node=50        ##number of requested CPUs
+#SBATCH --time=40:00:00             ##time requested
+#SBATCH --job-name diversity              ##name of job
+#SBATCH -A microbiome                ##name of the queue you are using. Could be scholar or microbiome if you are on snyder
+
+#########################################################################
+echo "start time"
+date +"%d %B %Y %H:%M:%S"
+
+cd $RCAC_SCRATCH
+cd manuscript_project_scripts/data_download/use-scheduler
+
+#step: Load Modules
+
+echo "loading bioinfo"
+module load bioinfo
+module load Qiime/2-2023.9
+
+echo "phylogenetic tree is in the making"
+qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences rep-seqs.qza \
+  --o-alignment aligned-rep-seqs.qza \
+  --o-masked-alignment masked-aligned-rep-seqs.qza \
+  --o-tree unrooted-tree.qza \
+  --o-rooted-tree rooted-tree.qza
+
+echo "core-metrics!"
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny rooted-tree.qza \
+  --i-table table.qza \
+  --p-sampling-depth 1065 \
+  --m-metadata-file ../../NewMetadataFile.txt \
+  --output-dir core-metrics-results
+
+echo "alpha significance tests"
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/faith_pd_vector.qza \
+  --m-metadata-file ../../NewMetadataFile.txt \
+  --o-visualization core-metrics-results/faith-pd-group-significance.qzv
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/evenness_vector.qza \
+  --m-metadata-file ../../NewMetadataFile.txt \
+  --o-visualization core-metrics-results/evenness-group-significance.qzv
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/shannon_vector.qza \
+  --m-metadata-file ../../NewMetadataFile.txt \
+  --o-visualization core-metrics-results/shannon_vector.qzv
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/observed_features_vector.qza \
+  --m-metadata-file ../../NewMetadataFile.txt \
+  --o-visualization core-metrics-results/observed_features_vector.qzv
+
+echo "beta significance tests"
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/unweighted_unifrac_distance_matrix.qza \
+  --m-metadata-file ../../NewMetadataFile.txt \
+  --m-metadata-column treatment \
+  --o-visualization core-metrics-results/unweighted-unifrac-treatment-significance.qzv \
+  --p-pairwise
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/unweighted_unifrac_distance_matrix.qza \
+  --m-metadata-file ../../NewMetadataFile.txt \
+  --m-metadata-column caries_status \
+  --o-visualization core-metrics-results/unweighted-unifrac-caries-status-significance.qzv \
+  --p-pairwise
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/weighted_unifrac_distance_matrix.qza \
+  --m-metadata-file ../../NewMetadataFile.txt \
+  --m-metadata-column treatment \
+  --o-visualization core-metrics-results/weighted-unifrac-treatment-significance.qzv \
+  --p-pairwise
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/weighted_unifrac_distance_matrix.qza \
+  --m-metadata-file ../../NewMetadataFile.txt \
+  --m-metadata-column caries_status \
+  --o-visualization core-metrics-results/weighted-unifrac-caries-status-significance.qzv \
+  --p-pairwise
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/bray_curtis_distance_matrix.qza \
+  --m-metadata-file ../../NewMetadataFile.txt \
+  --m-metadata-column treatment \
+  --o-visualization core-metrics-results/bray_curtis-treatment-significance.qzv \
+  --p-pairwise
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/bray_curtis_distance_matrix.qza \
+  --m-metadata-file ../../NewMetadataFile.txt \
+  --m-metadata-column caries_status \
+  --o-visualization core-metrics-results/bray_curtis-caries-status-significance.qzv \
+  --p-pairwise
+
+#########################################################################
