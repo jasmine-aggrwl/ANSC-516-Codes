@@ -108,3 +108,5 @@ qiime diversity beta-group-significance \
   --p-pairwise
 
 #########################################################################
+
+sbatch DiversityTests.slurm
