@@ -1,0 +1,264 @@
+################################################################################
+########################Beta Diversity for caries-active########################
+library(devtools)
+library(tidyverse)
+library(vegan)
+library(qiime2R)
+
+#########################################
+getwd()
+setwd("../data")
+
+metadata <- read.delim("NewMetadataFile.txt", sep = "\t", header = T, quote = "", stringsAsFactors = F)
+#remove rows with caries-free
+metadata <- metadata[-c(1:57), ]
+
+#Now the qiime2R method
+str(metadata)
+metadata$treatment <- factor(metadata$treatment)
+#the above live makes "treatment" as a factor; I can then read what the various values are within it
+levels(metadata$`treatment`)
+#"levels" reads the different values in the column "treatment" 
+colnames(metadata)[4] <- "caries.status"
+str(metadata)
+metadata$caries.status <- factor(metadata$caries.status)
+levels(metadata$`caries.status`)
+str(metadata)
+
+row.names(metadata) <- metadata$sample.id
+row.names(metadata)
+
+setwd("core-metrics-results")
+
+bc_PCoA<-read_qza("bray_curtis_pcoa_results.qza")
+wUF <- read_qza("weighted_unifrac_pcoa_results.qza")
+jacc_PCoA<-read_qza("jaccard_pcoa_results.qza")
+uwUF <- read_qza("unweighted_unifrac_pcoa_results.qza")
+
+body_colors <- c("Green", "Orange", "Purple")
+
+bc_meta <- bc_PCoA$data$Vectors %>%
+  select(SampleID, PC1, PC2, PC3) %>%
+  inner_join(metadata, by = c("SampleID" = "sample.id"))
+
+ggplot(bc_meta, aes(x=PC1, y=PC2, color=treatment)) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  theme_q2r() +
+  xlab("PC1 (32.27%)") +
+  ylab("PC2 (22.28%)") +
+  scale_color_manual(values=c("Green", "Orange", "Purple"), name = "Treatment Caries-active only")
+
+# Now we are going to make our code a little more re-usable
+my_column <- "treatment"
+#my_column <- "subject"
+
+ggplot(bc_meta, aes(x=PC1, y=PC2, color=treatment)) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  theme_q2r() +
+  facet_grid(~caries.status) +
+  xlab(paste0("PC1 (", round(100*bc_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*bc_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=body_colors, name = my_column)
+ggsave(paste0("../../output/BC_caries-active-basic_", my_column,".tiff"), height=2, width=3, device="tiff") # save a PDF 3 inches by 4 inches
+
+setwd('../')
+getwd()
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),bc_meta,mean)
+colnames(centroids)[1] <- "treatment"
+
+ggplot(bc_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*bc_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*bc_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=body_colors, name = my_column)
+ggsave(paste0("../output/BC-caries-active-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+bc_dist_mat<-read_qza("core-metrics-results/bray_curtis_distance_matrix.qza")
+bc_dm <- as.matrix(bc_dist_mat$data) 
+rownames(bc_dm) == metadata$SampleID ## all these values need to be "TRUE"
+metadata_sub <- metadata[match(rownames(bc_dm),metadata$SampleID),]
+rownames(bc_dm) == metadata_sub$SampleID ## all these values need to be "TRUE"
+
+jacc_meta <- jacc_PCoA$data$Vectors %>%
+  select(SampleID, PC1, PC2, PC3) %>%
+  inner_join(metadata, by = c("SampleID" = "sample.id"))
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),jacc_meta,mean)
+colnames(centroids)[1] <- "treatment"
+
+ggplot(jacc_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*jacc_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*jacc_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=body_colors, name = my_column)
+ggsave(paste0("../output/Jacc-Caries-active-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+wUF_meta <- wUF$data$Vectors %>%
+  select(SampleID, PC1, PC2, PC3) %>%
+  inner_join(metadata, by = c("SampleID" = "sample.id"))
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),wUF_meta,mean)
+colnames(centroids)[1] <- "treatment"
+
+ggplot(wUF_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*wUF$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*wUF$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=body_colors, name = my_column)
+ggsave(paste0("../output/wUF-Caries-active-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+uwUF_meta <- uwUF$data$Vectors %>%
+  select(SampleID, PC1, PC2, PC3) %>%
+  inner_join(metadata, by = c("SampleID" = "sample.id"))
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),uwUF_meta,mean)
+colnames(centroids)[1] <- "treatment"
+
+ggplot(uwUF_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*uwUF$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*uwUF$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=body_colors, name = my_column)
+ggsave(paste0("../output/uwUF-Caries-active-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+################################################################################
+#########################Beta Diversity for caries-free#########################
+
+metadata <- read.delim("NewMetadataFile.txt", sep = "\t", header = T, quote = "", stringsAsFactors = F)
+#remove rows with caries-free
+metadata <- metadata[-c(58:108), ]
+
+#Now the qiime2R method
+str(metadata)
+metadata$treatment <- factor(metadata$treatment)
+#the above live makes "treatment" as a factor; I can then read what the various values are within it
+levels(metadata$`treatment`)
+#"levels" reads the different values in the column "treatment" 
+colnames(metadata)[4] <- "caries.status"
+str(metadata)
+metadata$caries.status <- factor(metadata$caries.status)
+levels(metadata$`caries.status`)
+str(metadata)
+
+row.names(metadata) <- metadata$sample.id
+row.names(metadata)
+
+setwd("core-metrics-results")
+
+bc_PCoA<-read_qza("bray_curtis_pcoa_results.qza")
+wUF <- read_qza("weighted_unifrac_pcoa_results.qza")
+jacc_PCoA<-read_qza("jaccard_pcoa_results.qza")
+uwUF <- read_qza("unweighted_unifrac_pcoa_results.qza")
+
+body_colors <- c("Green", "Orange", "Purple")
+
+bc_meta <- bc_PCoA$data$Vectors %>%
+  select(SampleID, PC1, PC2, PC3) %>%
+  inner_join(metadata, by = c("SampleID" = "sample.id"))
+
+ggplot(bc_meta, aes(x=PC1, y=PC2, color=treatment)) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  theme_q2r() +
+  xlab("PC1 (32.27%)") +
+  ylab("PC2 (22.28%)") +
+  scale_color_manual(values=c("Green", "Orange", "Purple"), name = "Treatment Caries-free only")
+
+# Now we are going to make our code a little more re-usable
+my_column <- "treatment"
+#my_column <- "subject"
+
+ggplot(bc_meta, aes(x=PC1, y=PC2, color=treatment)) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  theme_q2r() +
+  facet_grid(~caries.status) +
+  xlab(paste0("PC1 (", round(100*bc_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*bc_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=body_colors, name = my_column)
+ggsave(paste0("../../output/BC_caries-free-basic_", my_column,".tiff"), height=2, width=3, device="tiff") # save a PDF 3 inches by 4 inches
+
+setwd('../')
+getwd()
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),bc_meta,mean)
+colnames(centroids)[1] <- "treatment"
+
+ggplot(bc_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*bc_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*bc_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=body_colors, name = my_column)
+ggsave(paste0("../output/BC-Caries-free-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+bc_dist_mat<-read_qza("core-metrics-results/bray_curtis_distance_matrix.qza")
+bc_dm <- as.matrix(bc_dist_mat$data) 
+rownames(bc_dm) == metadata$SampleID ## all these values need to be "TRUE"
+metadata_sub <- metadata[match(rownames(bc_dm),metadata$SampleID),]
+rownames(bc_dm) == metadata_sub$SampleID ## all these values need to be "TRUE"
+
+jacc_meta <- jacc_PCoA$data$Vectors %>%
+  select(SampleID, PC1, PC2, PC3) %>%
+  inner_join(metadata, by = c("SampleID" = "sample.id"))
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),jacc_meta,mean)
+colnames(centroids)[1] <- "treatment"
+
+ggplot(jacc_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*jacc_PCoA$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*jacc_PCoA$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=body_colors, name = my_column)
+ggsave(paste0("../output/Jacc-Caries-free-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+wUF_meta <- wUF$data$Vectors %>%
+  select(SampleID, PC1, PC2, PC3) %>%
+  inner_join(metadata, by = c("SampleID" = "sample.id"))
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),wUF_meta,mean)
+colnames(centroids)[1] <- "treatment"
+
+ggplot(wUF_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*wUF$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*wUF$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=body_colors, name = my_column)
+ggsave(paste0("../output/wUF-Caries-free-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
+uwUF_meta <- uwUF$data$Vectors %>%
+  select(SampleID, PC1, PC2, PC3) %>%
+  inner_join(metadata, by = c("SampleID" = "sample.id"))
+
+centroids <- aggregate(cbind(PC1,PC2)~get(my_column),uwUF_meta,mean)
+colnames(centroids)[1] <- "treatment"
+
+ggplot(uwUF_meta, aes(x=PC1, y=PC2, color=get(my_column))) +
+  geom_point() + #alpha controls transparency and helps when points are overlapping
+  geom_point(data=centroids, size = 3) +
+  theme_q2r() +
+  stat_ellipse(level = 0.95, type = "t") +
+  xlab(paste0("PC1 (", round(100*uwUF$data$ProportionExplained[1], digits = 2), "%)")) +
+  ylab(paste0("PC2 (", round(100*uwUF$data$ProportionExplained[2], digits = 2), "%)")) +
+  scale_color_manual(values=body_colors, name = my_column)
+ggsave(paste0("../output/uwUF-Caries-free-ellipse_", my_column,".pdf"), height=3, width=4.5, device="pdf") # save a PDF 3 inches by 4 inches
+
