@@ -1,4 +1,7 @@
-log onto cluster 
+#Log into cluster, and cd in the scratch data base 
+  ssh <username>@bell.rcac.purdue.edu -- <enter password>
+  cd $RCAC_SCRATCH
+  cd manuscript_project_scripts/data_download/use-scheduler/
 
 creat slurm file as follows: 
 #########################################################################
